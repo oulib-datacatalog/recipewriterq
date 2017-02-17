@@ -1,15 +1,15 @@
 __author__ = "Tyler Pearson <tdpearson>"
 
 from celery.task import task
-from hashlib import sha1, md5
 from collections import OrderedDict
 from json import dumps
 from operator import itemgetter
 from uuid import uuid5, NAMESPACE_DNS
 import logging
-import pandas as pd
+import pandas as pd  # TODO: slow to load - replace with something else
 import requests
 import os
+
 
 try:
     from urllib.parse import urlparse
@@ -32,11 +32,9 @@ bag_manifest_file = "manifest-md5.txt"
 logging.basicConfig(level=logging.INFO)
 
 repoUUID = uuid5(NAMESPACE_DNS, 'repository.ou.edu')
-repoSHA = sha1(bytes(str(repoUUID), "ASCII")).hexdigest()
 
 # Assert correct generation
 assert str(repoUUID) == "eb0ecf41-a457-5220-893a-08b7604b7110"
-assert repoSHA == "1639fb25f09f85a3b035bd7a0a62b2a9c7e00c18"
 
 
 def io_from(path):
@@ -148,3 +146,4 @@ def generate_recipe_files(csvpath, bagpath):
             f.write(process_bag(bagpath, mmsid, title, filename))
 
     return "{0}/oulib_tasks/{1}".format(hostname, task_id)
+
