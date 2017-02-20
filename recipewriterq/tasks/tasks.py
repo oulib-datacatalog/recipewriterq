@@ -47,7 +47,7 @@ def io_from(path):
         else:
             logging.debug("detected file")
             return open(path)
-    except ConnectionError as err:
+    except requests.ConnectionError as err:
         logging.error(err)
     except IOError as err:
         logging.error(err)
