@@ -6,5 +6,6 @@ setup(name='recipewriterq',
       packages= find_packages(),
       install_requires=[
           'celery==3.1.22',
+          'bagit==1.5.4',
       ],
 )
