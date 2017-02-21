@@ -70,7 +70,7 @@ def marc_xml_exists(mmsid, outpath):
     return False
 
 
-@task
+@task()
 def derivative_recipe(taskid, mmsid=None, title=None):
     """
     Generate recipe json file from derivative.
