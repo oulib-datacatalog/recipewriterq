@@ -64,7 +64,7 @@ def generate_recipe(mmsid, title, bagname, payload):
     return dumps(meta, indent=4, ensure_ascii=False).encode("UTF-8")
 
 
-def marc_xml_exists(mmsid, outpath):
+def get_marc_xml(mmsid, outpath):
     """ Queries Alma with MMS ID to obtain corresponding MARC XML """
     # TODO: write code
     return False
