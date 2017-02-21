@@ -120,7 +120,7 @@ def bag_derivatives(taskid, update_manifest=True):
 
     bag_path = "{0}/oulib_tasks/{1}/derivative/".format(basedir, taskid)
     for path in os.listdir(bag_path):
-        fullpath = "{0}/{1}".format(bagpath, path)
+        fullpath = "{0}/{1}".format(bag_path, path)
         try:
             bag = bagit.Bag(fullpath)
         except bagit.BagError:
