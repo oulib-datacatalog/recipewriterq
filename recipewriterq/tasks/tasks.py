@@ -3,31 +3,16 @@ __author__ = "Tyler Pearson <tdpearson>"
 from celery.task import task
 from collections import OrderedDict
 from json import dumps
-from operator import itemgetter
 from uuid import uuid5, NAMESPACE_DNS
+import bagit
 import logging
-import pandas as pd  # TODO: slow to load - replace with something else
-import requests
 import os
-
-
-try:
-    from urllib.parse import urlparse
-except ImportError:
-    from urlparse import urlparse
-
-try:
-    from io import StringIO
-except ImportError:
-    from StringIO import StringIO
 
 
 #Default base directory
 basedir = "/data/web_data/static"
 hostname = "https://cc.lib.ou.edu"
 
-#Default manifest file name
-bag_manifest_file = "manifest-md5.txt"
 
 logging.basicConfig(level=logging.INFO)
 
@@ -37,113 +22,115 @@ repoUUID = uuid5(NAMESPACE_DNS, 'repository.ou.edu')
 assert str(repoUUID) == "eb0ecf41-a457-5220-893a-08b7604b7110"
 
 
-def io_from(path):
-    """ returns io object to url contents or file """
-    try:
-        logging.debug("Reading url or file...")
-        if urlparse(path).scheme.lower() in ["http", "https"]:
-            logging.debug("detected url")
-            return StringIO(requests.get(path).content.decode('utf-8'))
-        else:
-            logging.debug("detected file")
-            return open(path)
-    except requests.ConnectionError as err:
-        logging.error(err)
-    except IOError as err:
-        logging.error(err)
-
-
-def process_csv(inpath):
-    """ Returns pandas dataframe from csv bag listing """
-    logging.debug("Processing CSV...")
-    frame = pd.read_csv(io_from(inpath))[['MMS ID', 'Title', 'File name']]
-    has_missing_details = frame[frame.isnull().any(axis=1) == True]
-    working_list = frame[frame.isnull().any(axis=1) == False]
-    if not has_missing_details.empty:  # we have rows with missing details - log it
-        logging.warning("Lines with missing details:\n%s" % has_missing_details)
-    logging.debug("Working list:\n%s" % working_list)
-    
-    return working_list
-
-
-def get_bag_manifest(bagpath, manifest=bag_manifest_file):
-    """ Returns manifest file contents """
-    try:
-        logging.debug("Locating bag manifest: %s/%s" % (bagpath, manifest))
-        return io_from("%s/%s" % (bagpath, manifest)).read()
-    except AttributeError as err:
-        logging.error(err)
-
-
-def process_manifest(bagname, bagpath, content):
+def process_manifest(bagname, payload, include_exif=False):
     """ Returns list with ordered page details """
-    if content:
-        logging.debug("Processing manifest...")
-        split_lines = [line.split("  ") for line in content.split("\n") if line]
-        tif_list = [[tif_hash, tif_filename] for tif_hash, tif_filename in split_lines if 'tif' in tif_filename.lower()]
-        sorted_tif_list = sorted(tif_list, key=itemgetter(1))
+    pages = []
 
-        pages = []
+    logging.debug("Processing pages...")
+    for index, item in enumerate(sorted(payload)):
+        filename, hashes = item, payload[item]
+        page = OrderedDict()
+        page['label'] = "Image {0}".format(str(index + 1))
+        page['file'] = "{0}/{1}/{2}".format(hostname, bagname, filename)
+        for page_hash in hashes:
+            page[page_hash] = hashes[page_hash]
+        page['uuid'] = str(uuid5(repoUUID, "{0}/{1}".format(bagname, filename)))
+        if include_exif:
+            page['exif'] = "{0}.exif.txt".format(filename.split("/")[1])
+        logging.debug(page)
+        pages.append(page)
 
-        logging.debug("Processing pages...")
-        for index, file_details in enumerate(sorted_tif_list):
-            tif_hash, tif_filename = file_details
-            page = OrderedDict()
-            page['label'] = "Image %s" % str(index + 1)
-            page['file'] = "%s/%s" % (bagpath, tif_filename)
-            page['md5'] = tif_hash
-            page['uuid'] = str(uuid5(repoUUID, "%s/%s" % (bagname, tif_filename)))
-            page['exif'] = "%s.exif.txt" % tif_filename.split("/")[1]
-
-            logging.debug(page)
-            pages.append(page)
-
-        return pages
-    logging.debug("No content in manifest...")
+    return pages
 
 
-def process_bag(bagpath, mmsid, title, filename):
-    logging.info("Processing bag: %s" % filename)
-    logging.debug("bagpath: %s" % bagpath)
-    logging.debug("mmsid: %s" % mmsid)
-    logging.debug("title: %s" % title)
+def generate_recipe(mmsid, title, bagname, payload):
+    """ generates recipe and returns json string """
+    logging.info("Processing bag: {0}".format(bagname))
+    logging.debug("mmsid: {0}".format(mmsid))
+    logging.debug("title: {0}".format(title))
     meta = OrderedDict()
     meta['recipe'] = OrderedDict()
     meta['recipe']['import'] = 'book'
     meta['recipe']['update'] = 'false'
-    meta['recipe']['uuid'] = str(uuid5(repoUUID, filename))
+    meta['recipe']['uuid'] = str(uuid5(repoUUID, bagname))
     meta['recipe']['label'] = title
-    meta['recipe']['metadata'] = OrderedDict()
-    # the xml file is populated with data provided from http://52.0.88.11 (get request with bib_id = mmsid)
-    meta['recipe']['metadata']['marcxml'] = filename + ".xml"
+    if get_marc_xml(mmsid):
+        meta['recipe']['metadata'] = OrderedDict()
+        meta['recipe']['metadata']['marcxml'] = bagname + ".xml"
 
-    manifest = get_bag_manifest("%s/%s" % (bagpath, filename))
-    meta['recipe']['pages'] = process_manifest(filename, bagpath, manifest)
+    meta['recipe']['pages'] = process_manifest(bagname, payload)
 
-    logging.debug("Generated JSON:\n%s" % dumps(meta, indent=4))
+    logging.debug("Generated JSON:\n{0}".format(dumps(meta, indent=4)))
     return dumps(meta, indent=4, ensure_ascii=False).encode("UTF-8")
 
 
-@task()
-def generate_recipe_files(csvpath, bagpath):
+def marc_xml_exists(mmsid, outpath):
+    """ Queries Alma with MMS ID to obtain corresponding MARC XML """
+    # TODO: write code
+    return False
+
+
+@task
+def derivative_recipe(taskid, mmsid=None, title=None):
     """
-    Repository recipe generator for Islandora
+    Generate recipe json file from derivative.
+
+    This requires that the derivative has already been bagged.
+    This will add the json file and update the tag-manifest file.
+
     args:
-      csvpath - path or url to csv file (file must contain MMS ID, Title, and File name details)
-      bagpath - base path or url containing bags to process
+      taskid: cybercommons generated task id for derivative
+      mmsid: MMS ID is needed to obtain MARC XML
+      title: Title of collection
     """
 
-    task_id = str(generate_recipe_files.request.id)
-    # create Result Directory
-    resultpath = os.path.join(basedir, 'oulib_tasks/', task_id)
+    derivatives = "{0}/oulib_tasks/{1}/derivative/".format(basedir, taskid)
+    for path in os.listdir(derivatives):
+        try:
+            logging.debug("Accessing: {0}".format(path))
+            bag = bagit.Bag(path)
+            bagname = bag.info['External-Description']
+            payload = bag.payload_entries()
+            recipefile = "{0}/{1}.json".format(path, bagname)
+            recipe = generate_recipe(mmsid, title, bagname, payload)
+            logging.debug("Writing recipe to: {0}".format(recipefile))
+            with open(recipefile, "w") as f:
+                f.write(recipe)
+            bag.save()
+            
+        except bagit.BagError:
+            logging.debug("Not a bag: {0}".format(path))
+            pass
+        except IOError as err:
+            logging.error(err)
+    # point back at task
+    return "{0}/oulib_tasks/{1}".format(hostname, taskid)
 
-    os.makedirs(resultpath)
 
-    for row in process_csv(csvpath).iterrows():
-        mmsid, title, filename = row[1]  # ignore index
-        json_file = os.path.join(resultpath, filename + ".json")
-        with open(json_file, "wb") as f:
-            f.write(process_bag(bagpath, mmsid, title, filename))
+@task()
+def bag_derivatives(taskid, update_manifest=True):
+    """
+    Generate bag of derivative
 
-    return "{0}/oulib_tasks/{1}".format(hostname, task_id)
+    args:
+      taskid: cybercommons generated task id for derivative
+      update_manifest: boolean to update bag manifest - default is True
+    """
+
+    bag_path = "{0}/oulib_tasks/{1}/derivative/".format(basedir, taskid)
+    for path in os.listdir(bag_path):
+        try:
+            bag = bagit.Bag(path)
+        except bagit.BagError:
+            bag = bagit.make_bag(path)
+
+        bag.info['External-Description'] = path
+        bag.info['External-Identifier'] = 'University of Oklahoma Libraries'
+
+        try:
+            bag.save(manifests=update_manifest)
+        except IOError as err:
+            logging.error(err)
+    # point back at task
+    return "{0}/oulib_tasks/{1}".format(hostname, taskid)
 

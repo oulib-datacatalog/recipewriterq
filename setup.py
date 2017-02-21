@@ -6,7 +6,5 @@ setup(name='recipewriterq',
       packages= find_packages(),
       install_requires=[
           'celery==3.1.22',
-          'requests==2.9.1',
-          'pandas',
       ],
 )
