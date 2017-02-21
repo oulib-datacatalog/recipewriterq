@@ -86,12 +86,13 @@ def derivative_recipe(taskid, mmsid=None, title=None):
 
     derivatives = "{0}/oulib_tasks/{1}/derivative/".format(basedir, taskid)
     for path in os.listdir(derivatives):
+        fullpath = "{0}/{1}".format(derivatives, path)
         try:
             logging.debug("Accessing: {0}".format(path))
-            bag = bagit.Bag(path)
+            bag = bagit.Bag(fullpath)
             bagname = bag.info['External-Description']
             payload = bag.payload_entries()
-            recipefile = "{0}/{1}.json".format(path, bagname)
+            recipefile = "{0}/{1}.json".format(fullpath, bagname)
             recipe = generate_recipe(mmsid, title, bagname, payload)
             logging.debug("Writing recipe to: {0}".format(recipefile))
             with open(recipefile, "w") as f:
@@ -119,10 +120,11 @@ def bag_derivatives(taskid, update_manifest=True):
 
     bag_path = "{0}/oulib_tasks/{1}/derivative/".format(basedir, taskid)
     for path in os.listdir(bag_path):
+        fullpath = "{0}/{1}".format(bagpath, path)
         try:
-            bag = bagit.Bag(path)
+            bag = bagit.Bag(fullpath)
         except bagit.BagError:
-            bag = bagit.make_bag(path)
+            bag = bagit.make_bag(fullpath)
 
         bag.info['External-Description'] = path
         bag.info['External-Identifier'] = 'University of Oklahoma Libraries'
