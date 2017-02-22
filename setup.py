@@ -7,5 +7,7 @@ setup(name='recipewriterq',
       install_requires=[
           'celery==3.1.22',
           'bagit==1.5.4',
+          'lxml==3.5.0',
+          'requests==2.13.0',
       ],
 )
