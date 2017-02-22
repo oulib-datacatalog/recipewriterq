@@ -3,8 +3,8 @@ __author__ = "Tyler Pearson <tdpearson>"
 from celery.task import task
 from collections import OrderedDict
 from json import dumps
-from lxml import etree
 from uuid import uuid5, NAMESPACE_DNS
+import xml.etree.cElementTree as ET
 import bagit
 import logging
 import os
@@ -70,10 +70,11 @@ def generate_recipe(mmsid, taskid, title, bagname, payload, fullpath):
 
 
 def get_title_from_marc(bagname, fullpath):
-    tree = etree.parse("{0}/{1}.xml".format(fullpath, bagname))
     try:
-        return tree.xpath('title')[0].text
-    except IndexError as err:
+        tree = ET.parse("{0}/{1}.xml".format(fullpath, bagname))
+        root = tree.getroot()
+        return root.findall('title')[0].text
+    except (IndexError, IOError) as err:
         logging.error(err)
         return None
 
