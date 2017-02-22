@@ -32,7 +32,7 @@ def process_manifest(taskid, bagname, payload, include_exif=False):
         filename, hashes = item, payload[item]
         page = OrderedDict()
         page['label'] = "Image {0}".format(str(index + 1))
-        page['file'] = "{0}/oulib_tasks/{1}/derivative/{2}/data/{3}".format(hostname, taskid, bagname, filename)
+        page['file'] = "{0}/oulib_tasks/{1}/derivative/{2}/{3}".format(hostname, taskid, bagname, filename)
         for page_hash in hashes:
             page[page_hash] = hashes[page_hash]
         page['uuid'] = str(uuid5(repoUUID, "{0}/{1}".format(bagname, filename)))
@@ -57,7 +57,7 @@ def generate_recipe(mmsid, taskid, title, bagname, payload, fullpath):
     meta['recipe']['label'] = title
     if get_marc_xml(mmsid, bagname, fullpath):
         meta['recipe']['metadata'] = OrderedDict()
-        meta['recipe']['metadata']['marcxml'] = "{0}/{1}.xml".format(fullpath, bagname)
+        meta['recipe']['metadata']['marcxml'] = "{0}/oulib_tasks/{1}/derivative/{2}/{2}.xml".format(hostname, taskid, bagname)
     if not title:
         # attempt to set from marc xml
         logging.debug("Getting title from marc file")
