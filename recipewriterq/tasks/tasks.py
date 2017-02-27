@@ -24,7 +24,7 @@ repoUUID = uuid5(NAMESPACE_DNS, 'repository.ou.edu')
 assert str(repoUUID) == "eb0ecf41-a457-5220-893a-08b7604b7110"
 
 
-def process_manifest(taskid, bagname, payload, include_exif=False):
+def process_manifest(taskid, bagname, payload, include_exif=True):
     """ Returns list with ordered page details """
     pages = []
     logging.debug("Processing pages...")
