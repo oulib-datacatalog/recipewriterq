@@ -93,9 +93,17 @@ def get_marc_xml(mmsid, bagname, fullpath):
     if apikey:
         try:
             response = requests.get(url.format(mmsid, apikey))
-            with open("{0}/{1}.xml".format(fullpath, bagname), "wb") as f:
-                f.write(response.content)
-                return True
+            xml = response.content
+            # get marc21 record from bib
+            record = ET.fromstring(xml).find("record")
+            record.attrib['xmlns'] = "http://www.loc.gov/MARC21/slim"
+            if not record.find(".//*[@tag='001']"):  # add if missing id
+                controlfield = ET.Element("controlfield", tag="001")
+                controlfield.text = mmsid
+                record.insert(1, controlfield)
+            marc21 = ET.ElementTree(record)
+            marc21.write("{0}/{1}.xml".format(fullpath, bagname), encoding='utf-8', xml_declaration=True)
+            return True
         except (IOError, requests.ConnectionError) as err:
             logging.error(err)
     # otherwise
