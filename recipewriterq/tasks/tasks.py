@@ -55,13 +55,15 @@ def generate_recipe(mmsid, taskid, title, bagname, payload, fullpath):
     meta['recipe']['update'] = 'false'
     meta['recipe']['uuid'] = str(uuid5(repoUUID, bagname))
     meta['recipe']['label'] = title
-    if get_marc_xml(mmsid, bagname, fullpath):
+
+    bib = get_bib_record(mmsid)
+    if get_marc_xml(mmsid, bagname, fullpath, bib):
         meta['recipe']['metadata'] = OrderedDict()
         meta['recipe']['metadata']['marcxml'] = "{0}/oulib_tasks/{1}/derivative/{2}/{2}.xml".format(hostname, taskid, bagname)
     if not title:
         # attempt to set from marc xml
         logging.debug("Getting title from marc file")
-        meta['recipe']['label'] = get_title_from_marc(bagname, fullpath)
+        meta['recipe']['label'] = get_title_from_bib(bib)
 
     meta['recipe']['pages'] = process_manifest(taskid, bagname, payload)
 
@@ -69,17 +71,7 @@ def generate_recipe(mmsid, taskid, title, bagname, payload, fullpath):
     return dumps(meta, indent=4, ensure_ascii=False).encode("UTF-8")
 
 
-def get_title_from_marc(bagname, fullpath):
-    try:
-        tree = ET.parse("{0}/{1}.xml".format(fullpath, bagname))
-        root = tree.getroot()
-        return root.findall('title')[0].text
-    except (IndexError, IOError) as err:
-        logging.error(err)
-        return None
-
-
-def get_marc_xml(mmsid, bagname, fullpath):
+def get_bib_record(mmsid):
     """ Queries Alma with MMS ID to obtain corresponding MARC XML """
 
     url = "https://api-na.hosted.exlibrisgroup.com/almaws/v1/bibs/{0}?expand=None&apikey={1}"
@@ -93,22 +85,37 @@ def get_marc_xml(mmsid, bagname, fullpath):
     if apikey:
         try:
             response = requests.get(url.format(mmsid, apikey))
-            xml = response.content
-            # get marc21 record from bib
-            record = ET.fromstring(xml).find("record")
-            record.attrib['xmlns'] = "http://www.loc.gov/MARC21/slim"
-            if not record.find(".//*[@tag='001']"):  # add if missing id
-                controlfield = ET.Element("controlfield", tag="001")
-                controlfield.text = mmsid
-                record.insert(1, controlfield)
-            marc21 = ET.ElementTree(record)
-            marc21.write("{0}/{1}.xml".format(fullpath, bagname), encoding='utf-8', xml_declaration=True)
-            return True
-        except (IOError, requests.ConnectionError) as err:
+            return response.content
+        except requests.ConnectionError as err:
             logging.error(err)
-    # otherwise
-    return False
+            return None
 
+
+def get_title_from_bib(xml):
+    try:
+        tree = ET.fromstring(xml)
+        return tree.find('title').text
+    except IndexError as err:
+        logging.error(err)
+        return None
+
+
+def get_marc_xml(mmsid, bagname, fullpath, bibxml):
+    """ Gets MARC21 record from bib xml """
+
+    record = ET.fromstring(bibxml).find("record")
+    record.attrib['xmlns'] = "http://www.loc.gov/MARC21/slim"
+    if not record.find(".//*[@tag='001']"):  # add if missing id
+        controlfield = ET.Element("controlfield", tag="001")
+        controlfield.text = mmsid
+        record.insert(1, controlfield)
+    marc21 = ET.ElementTree(record)
+    try:
+        marc21.write("{0}/{1}.xml".format(fullpath, bagname), encoding='utf-8', xml_declaration=True)
+        return True
+    except IOError as err:
+        logging.error(err)
+        return False
 
 @task()
 def derivative_recipe(taskid, mmsid=None, title=None):
@@ -175,4 +182,3 @@ def bag_derivatives(taskid, update_manifest=True):
             logging.error(err)
     # point back at task
     return "{0}/oulib_tasks/{1}".format(hostname, taskid)
-
