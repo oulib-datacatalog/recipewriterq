@@ -37,9 +37,9 @@ def process_manifest(taskid, bagname, payload, formatparams=None, include_exif=T
         page['label'] = "Image {0}".format(str(index + 1))
         #page['file'] = "{0}/oulib_tasks/{1}/derivative/{2}/{3}".format(hostname, taskid, bagname, filename)
         if formatparams:
-            page['file'] = "{0}/{1}/{2}/{3}".format(ou_derivative_bag_url, bagname, formatparams, filename)
+            page['file'] = "{0}/{1}/{2}/data/{3}".format(ou_derivative_bag_url, bagname, formatparams, filename)
         else:
-            page['file'] = "{0}/{1}/{2}".format(ou_derivative_bag_url, bagname, filename)
+            page['file'] = "{0}/{1}/data/{2}".format(ou_derivative_bag_url, bagname, filename)
 
         for page_hash in hashes:
             page[page_hash] = hashes[page_hash]
