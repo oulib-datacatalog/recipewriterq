@@ -233,10 +233,10 @@ def process_derivative(derivative_args, mmsid, rmlocal=False):
                  for dirname in dirnames:
                      for filename in filenames:
                          if dirname:
-                             s3_key = "{0}/{1}/{2}/{3}/{4}".format(s3_destination, bag, formatparams, dirname, filename))
+                             s3_key = "{0}/{1}/{2}/{3}/{4}".format(s3_destination, bag, formatparams, dirname, filename)
                              filepath = os.path.join(bagpath, dirname, filename)
                          else:
-                             s3_key = "{0}/{1}/{2}/{3}".format(s3_destination, bag, formatparams, filename))
+                             s3_key = "{0}/{1}/{2}/{3}".format(s3_destination, bag, formatparams, filename)
                              filepath = os.path.join(bagpath, filename)
                          s3.meta.client.upload_file(filepath, bucket.name, s3_key)
              # remove derivative bag from local system
