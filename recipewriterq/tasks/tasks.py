@@ -59,7 +59,7 @@ def generate_recipe(mmsid, taskid, title, bagname, payload, fullpath):
     bib = get_bib_record(mmsid)
     if get_marc_xml(mmsid, bagname, fullpath, bib):
         meta['recipe']['metadata'] = OrderedDict()
-        meta['recipe']['metadata']['marcxml'] = "{0}/oulib_tasks/{1}/derivative/{2}/{2}.xml".format(hostname, taskid, bagname)
+        meta['recipe']['metadata']['marcxml'] = "{0}/oulib_tasks/{1}/derivative/{2}/marc.xml".format(hostname, taskid, bagname)
     if not title:
         # attempt to set from marc xml
         logging.debug("Getting title from marc file")
@@ -111,7 +111,7 @@ def get_marc_xml(mmsid, bagname, fullpath, bibxml):
         record.insert(1, controlfield)
     marc21 = ET.ElementTree(record)
     try:
-        marc21.write("{0}/{1}.xml".format(fullpath, bagname), encoding='utf-8', xml_declaration=True)
+        marc21.write("{0}/marc.xml".format(fullpath), encoding='utf-8', xml_declaration=True)
         return True
     except IOError as err:
         logging.error(err)
@@ -182,3 +182,24 @@ def bag_derivatives(taskid, update_manifest=True):
             logging.error(err)
     # point back at task
     return "{0}/oulib_tasks/{1}".format(hostname, taskid)
+
+
+@task()
+def process_derivative(derivative_args, mmsid):
+    """
+    This task is called as part of the loadbook process. You should not run this directly.
+
+    args:
+      derivative_args: results from the derivative_generation task
+      mmsid: mmsid of item to load
+    """
+
+    taskid = derivative_args.get('task_id')
+    bags = derivative_args.get('s3_bags')
+    formatparams = derivative_args.get('format_parameters')
+    
+    if taskid and bags:
+        bag_derivatives(taskid)
+        derivative_recipe(taskid, mmsid)
+        return {"task_id": taskid, "bags": bags, "format_parameters": formatparams}
+
