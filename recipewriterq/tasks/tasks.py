@@ -3,9 +3,11 @@ __author__ = "Tyler Pearson <tdpearson>"
 from celery.task import task
 from collections import OrderedDict
 from json import dumps
+from shutil import rmtree
 from uuid import uuid5, NAMESPACE_DNS
 import xml.etree.cElementTree as ET
 import bagit
+import boto3
 import logging
 import os
 import requests
@@ -13,6 +15,7 @@ import requests
 # Default base directory
 basedir = "/data/web_data/static"
 hostname = "https://cc.lib.ou.edu"
+ou_derivative_bag_url = "https://bag.ou.edu/derivative"
 
 apikeypath = "/code/alma_api_key"
 
@@ -24,7 +27,7 @@ repoUUID = uuid5(NAMESPACE_DNS, 'repository.ou.edu')
 assert str(repoUUID) == "eb0ecf41-a457-5220-893a-08b7604b7110"
 
 
-def process_manifest(taskid, bagname, payload, include_exif=True):
+def process_manifest(taskid, bagname, payload, formatparams=None, include_exif=True):
     """ Returns list with ordered page details """
     pages = []
     logging.debug("Processing pages...")
@@ -32,7 +35,12 @@ def process_manifest(taskid, bagname, payload, include_exif=True):
         filename, hashes = item, payload[item]
         page = OrderedDict()
         page['label'] = "Image {0}".format(str(index + 1))
-        page['file'] = "{0}/oulib_tasks/{1}/derivative/{2}/{3}".format(hostname, taskid, bagname, filename)
+        #page['file'] = "{0}/oulib_tasks/{1}/derivative/{2}/{3}".format(hostname, taskid, bagname, filename)
+        if formatparams:
+            page['file'] = "{0}/{1}/{2}/{3}".format(ou_derivative_bag_url, bagname, formatparams, filename)
+        else:
+            page['file'] = "{0}/{1}/{2}".format(ou_derivative_bag_url, bagname, filename)
+
         for page_hash in hashes:
             page[page_hash] = hashes[page_hash]
         page['uuid'] = str(uuid5(repoUUID, "{0}/{1}".format(bagname, filename)))
@@ -44,7 +52,7 @@ def process_manifest(taskid, bagname, payload, include_exif=True):
     return pages
 
 
-def generate_recipe(mmsid, taskid, title, bagname, payload, fullpath):
+def generate_recipe(mmsid, taskid, title, bagname, payload, formatparams=None, fullpath):
     """ generates recipe and returns json string """
     logging.info("Processing bag: {0}".format(bagname))
     logging.debug("mmsid: {0}".format(mmsid))
@@ -59,13 +67,19 @@ def generate_recipe(mmsid, taskid, title, bagname, payload, fullpath):
     bib = get_bib_record(mmsid)
     if get_marc_xml(mmsid, bagname, fullpath, bib):
         meta['recipe']['metadata'] = OrderedDict()
-        meta['recipe']['metadata']['marcxml'] = "{0}/oulib_tasks/{1}/derivative/{2}/marc.xml".format(hostname, taskid, bagname)
+        #meta['recipe']['metadata']['marcxml'] = "{0}/oulib_tasks/{1}/derivative/{2}/marc.xml".format(hostname, taskid, bagname)
+        if formatparams:
+            meta['recipe']['metadata']['marcxml'] = "{0}/{1}/{2}/marc.xml".format(ou_derivative_bag_url, bagname, formatparams) 
+        
+        else:
+            meta['recipe']['metadata']['marcxml'] = "{0}/{1}/marc.xml".format(ou_derivative_bag_url, bagname)
+
     if not title:
         # attempt to set from marc xml
         logging.debug("Getting title from marc file")
         meta['recipe']['label'] = get_title_from_bib(bib)
 
-    meta['recipe']['pages'] = process_manifest(taskid, bagname, payload)
+    meta['recipe']['pages'] = process_manifest(taskid, bagname, payload, formatparams)
 
     logging.debug("Generated JSON:\n{0}".format(dumps(meta, indent=4)))
     return dumps(meta, indent=4, ensure_ascii=False).encode("UTF-8")
@@ -118,7 +132,7 @@ def get_marc_xml(mmsid, bagname, fullpath, bibxml):
         return False
 
 @task()
-def derivative_recipe(taskid, mmsid=None, title=None):
+def derivative_recipe(taskid, mmsid=None, title=None, formatparams=None):
     """
     Generate recipe json file from derivative.
 
@@ -140,7 +154,7 @@ def derivative_recipe(taskid, mmsid=None, title=None):
             bagname = bag.info['External-Description']
             payload = bag.payload_entries()
             recipefile = "{0}/{1}.json".format(fullpath, bagname)
-            recipe = generate_recipe(mmsid, taskid, title, bagname, payload, fullpath)
+            recipe = generate_recipe(mmsid, taskid, title, bagname, payload, formatparams, fullpath)
             logging.debug("Writing recipe to: {0}".format(recipefile))
             with open(recipefile, "w") as f:
                 f.write(recipe)
@@ -185,21 +199,49 @@ def bag_derivatives(taskid, update_manifest=True):
 
 
 @task()
-def process_derivative(derivative_args, mmsid):
+def process_derivative(derivative_args, mmsid, rmlocal=False):
     """
     This task is called as part of the loadbook process. You should not run this directly.
 
     args:
       derivative_args: results from the derivative_generation task
       mmsid: mmsid of item to load
+      rmlocal: boolean indicating to remove local derivative bag after loading to s3 - default is False
+
+    Returns:
+      List of urls to recipe files
     """
+
+    s3_bucket='ul-bagit'
+    s3_destination='derivative'
 
     taskid = derivative_args.get('task_id')
     bags = derivative_args.get('s3_bags')
     formatparams = derivative_args.get('format_parameters')
     
+    s3 = boto3.resource('s3')
+    bucket = s3.Bucket(s3_bucket)
+
     if taskid and bags:
+        # generate meta and bag derivatives
         bag_derivatives(taskid)
-        derivative_recipe(taskid, mmsid)
-        return {"task_id": taskid, "bags": bags, "format_parameters": formatparams}
+        derivative_recipe(taskid, mmsid, formatparams=formatparams)
+        for bag in bags:
+            # move derivative bag into s3
+             bagpath = "{0}/oulib_tasks/{1}/derivative/{2}".format(basedir, taskid, bag)
+             for _, dirnames, filenames in os.walk(bagpath):
+                 for dirname in dirnames:
+                     for filename in filenames:
+                         if dirname:
+                             s3_key = "{0}/{1}/{2}/{3}/{4}".format(s3_destination, bag, formatparams, dirname, filename))
+                             filepath = os.path.join(bagpath, dirname, filename)
+                         else:
+                             s3_key = "{0}/{1}/{2}/{3}".format(s3_destination, bag, formatparams, filename))
+                             filepath = os.path.join(bagpath, filename)
+                         s3.meta.client.upload_file(filepath, bucket.name, s3_key)
+             # remove derivative bag from local system
+             if rmlocal:
+                 rmtree(bagpath)
+
+        return ["{0}/{1}/{2}/{1}.json".format(ou_derivative_bag_url, bag, formatparams) for bag in bags]
 
