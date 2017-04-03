@@ -52,7 +52,7 @@ def process_manifest(taskid, bagname, payload, formatparams=None, include_exif=T
     return pages
 
 
-def generate_recipe(mmsid, taskid, title, bagname, payload, formatparams=None, fullpath):
+def generate_recipe(mmsid, taskid, title, bagname, payload, fullpath, formatparams=None):
     """ generates recipe and returns json string """
     logging.info("Processing bag: {0}".format(bagname))
     logging.debug("mmsid: {0}".format(mmsid))
@@ -154,7 +154,7 @@ def derivative_recipe(taskid, mmsid=None, title=None, formatparams=None):
             bagname = bag.info['External-Description']
             payload = bag.payload_entries()
             recipefile = "{0}/{1}.json".format(fullpath, bagname)
-            recipe = generate_recipe(mmsid, taskid, title, bagname, payload, formatparams, fullpath)
+            recipe = generate_recipe(mmsid, taskid, title, bagname, payload, fullpath, formatparams)
             logging.debug("Writing recipe to: {0}".format(recipefile))
             with open(recipefile, "w") as f:
                 f.write(recipe)
