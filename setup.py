@@ -8,5 +8,6 @@ setup(name='recipewriterq',
           'celery==3.1.22',
           'bagit==1.5.4',
           'requests==2.13.0',
+          'boto3',
       ],
 )
