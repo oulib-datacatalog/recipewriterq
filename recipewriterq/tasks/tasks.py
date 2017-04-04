@@ -229,6 +229,7 @@ def process_derivative(derivative_args, mmsid=None, rmlocal=False):
         for bag in bags.split(','):
             # move derivative bag into s3
              bagpath = "{0}/oulib_tasks/{1}/derivative/{2}".format(basedir, taskid, bag)
+             logging.info("Accessing bag at: {0}".format(bagpath))
              for _, dirnames, filenames in os.walk(bagpath):
                  for dirname in dirnames:
                      for filename in filenames:
@@ -238,6 +239,7 @@ def process_derivative(derivative_args, mmsid=None, rmlocal=False):
                          else:
                              s3_key = "{0}/{1}/{2}/{3}".format(s3_destination, bag, formatparams, filename)
                              filepath = os.path.join(bagpath, filename)
+                         logging.info("Uploading to s3: {0}".format(filepath))
                          s3.meta.client.upload_file(filepath, bucket.name, s3_key)
              # remove derivative bag from local system
              if rmlocal:
