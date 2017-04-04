@@ -199,8 +199,7 @@ def bag_derivatives(taskid, update_manifest=True):
 
 
 @task()
-#def process_derivative(derivative_args, mmsid, rmlocal=False):
-def process_derivative(*args):
+def process_derivative(derivative_args, mmsid=None, rmlocal=False):
     """
     This task is called as part of the loadbook process. You should not run this directly.
 
