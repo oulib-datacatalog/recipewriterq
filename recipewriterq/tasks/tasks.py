@@ -215,9 +215,6 @@ def process_derivative(derivative_args, mmsid=None, rmlocal=False):
     s3_bucket='ul-bagit'
     s3_destination='derivative'
     
-    logging.info(args)
-    exit()
-
     taskid = derivative_args.get('task_id')
     bags = derivative_args.get('s3_bags')
     formatparams = derivative_args.get('format_parameters')
