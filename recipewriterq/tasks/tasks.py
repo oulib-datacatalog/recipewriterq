@@ -199,7 +199,7 @@ def bag_derivatives(taskid, update_manifest=True):
 
 
 @task()
-def process_derivative(derivative_args, mmsid, rmlocal=False):
+def process_derivative(*derivative_args, mmsid, rmlocal=False):
     """
     This task is called as part of the loadbook process. You should not run this directly.
 
@@ -214,10 +214,12 @@ def process_derivative(derivative_args, mmsid, rmlocal=False):
 
     s3_bucket='ul-bagit'
     s3_destination='derivative'
+    
+    logging.info(derivative_args)
 
-    taskid = derivative_args.get('task_id')
-    bags = derivative_args.get('s3_bags')
-    formatparams = derivative_args.get('format_parameters')
+    taskid = derivative_args[0].get('task_id')
+    bags = derivative_args[0].get('s3_bags')
+    formatparams = derivative_args[0].get('format_parameters')
     
     s3 = boto3.resource('s3')
     bucket = s3.Bucket(s3_bucket)
