@@ -226,7 +226,7 @@ def process_derivative(derivative_args, mmsid=None, rmlocal=False):
         # generate meta and bag derivatives
         bag_derivatives(taskid)
         derivative_recipe(taskid, mmsid, formatparams=formatparams)
-        for bag in bags:
+        for bag in bags.split(','):
             # move derivative bag into s3
              bagpath = "{0}/oulib_tasks/{1}/derivative/{2}".format(basedir, taskid, bag)
              for _, dirnames, filenames in os.walk(bagpath):
