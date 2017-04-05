@@ -2,6 +2,7 @@ __author__ = "Tyler Pearson <tdpearson>"
 
 from celery.task import task
 from collections import OrderedDict
+from glob import iglob
 from json import dumps
 from shutil import rmtree
 from uuid import uuid5, NAMESPACE_DNS
@@ -230,17 +231,27 @@ def process_derivative(derivative_args, mmsid=None, rmlocal=False):
             # move derivative bag into s3
              bagpath = "{0}/oulib_tasks/{1}/derivative/{2}".format(basedir, taskid, bag)
              logging.info("Accessing bag at: {0}".format(bagpath))
-             for _, dirnames, filenames in os.walk(bagpath):
-                 for dirname in dirnames:
-                     for filename in filenames:
-                         if dirname:
-                             s3_key = "{0}/{1}/{2}/{3}/{4}".format(s3_destination, bag, formatparams, dirname, filename)
-                             filepath = os.path.join(bagpath, dirname, filename)
-                         else:
-                             s3_key = "{0}/{1}/{2}/{3}".format(s3_destination, bag, formatparams, filename)
-                             filepath = os.path.join(bagpath, filename)
-                         logging.info("Uploading to s3: {0}".format(filepath))
-                         s3.meta.client.upload_file(filepath, bucket.name, s3_key)
+             #for _, dirnames, filenames in os.walk(bagpath):
+             #    for dirname in dirnames:
+             #        for filename in filenames:
+             #            if dirname:
+             #                s3_key = "{0}/{1}/{2}/{3}/{4}".format(s3_destination, bag, formatparams, dirname, filename)
+             #                filepath = os.path.join(bagpath, dirname, filename)
+             #            else:
+             #                s3_key = "{0}/{1}/{2}/{3}".format(s3_destination, bag, formatparams, filename)
+             #                filepath = os.path.join(bagpath, filename)
+             #            logging.info("Uploading to s3: {0}".format(filepath))
+             #            s3.meta.client.upload_file(filepath, bucket.name, s3_key)
+             for filepath in iglob("{0}/*.*".format(bagpath)):
+                 filename = filepath.split('/')[-1].lower()
+                 s3_key = "{0}/{1}/{2}/{3}".format(s3_destination, bag, formatparams, filename)
+                 logging.info("Saving {0} to {1}".format(filename, s3_key)
+                 s3.meta.client.upload_file(filepath, bucket.name, s3_key)
+             for filepath in iglob("{0}/data/*.*".format(bagpath)):
+                 filename = filepath.split('/')[-1].lower()
+                 s3_key = "{0}/{1}/{2}/data/{3}".format(s3_destination, bag, formatparams, filename)
+                 logging.info("Saving {0} to {1}".format(filename, s3_key)
+                 s3.meta.client.upload_file(filepath, bucket.name, s3_key)
              # remove derivative bag from local system
              if rmlocal:
                  rmtree(bagpath)
