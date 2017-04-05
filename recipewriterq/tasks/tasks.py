@@ -36,11 +36,10 @@ def process_manifest(taskid, bagname, payload, formatparams=None, include_exif=T
         filename, hashes = item, payload[item]
         page = OrderedDict()
         page['label'] = "Image {0}".format(str(index + 1))
-        #page['file'] = "{0}/oulib_tasks/{1}/derivative/{2}/{3}".format(hostname, taskid, bagname, filename)
         if formatparams:
-            page['file'] = "{0}/{1}/{2}/data/{3}".format(ou_derivative_bag_url, bagname, formatparams, filename)
+            page['file'] = "{0}/{1}/{2}/{3}".format(ou_derivative_bag_url, bagname, formatparams, filename)
         else:
-            page['file'] = "{0}/{1}/data/{2}".format(ou_derivative_bag_url, bagname, filename)
+            page['file'] = "{0}/{1}/{2}".format(ou_derivative_bag_url, bagname, filename)
 
         for page_hash in hashes:
             page[page_hash] = hashes[page_hash]
@@ -68,7 +67,6 @@ def generate_recipe(mmsid, taskid, title, bagname, payload, fullpath, formatpara
     bib = get_bib_record(mmsid)
     if get_marc_xml(mmsid, bagname, fullpath, bib):
         meta['recipe']['metadata'] = OrderedDict()
-        #meta['recipe']['metadata']['marcxml'] = "{0}/oulib_tasks/{1}/derivative/{2}/marc.xml".format(hostname, taskid, bagname)
         if formatparams:
             meta['recipe']['metadata']['marcxml'] = "{0}/{1}/{2}/marc.xml".format(ou_derivative_bag_url, bagname, formatparams) 
         
@@ -231,17 +229,6 @@ def process_derivative(derivative_args, mmsid=None, rmlocal=False):
             # move derivative bag into s3
              bagpath = "{0}/oulib_tasks/{1}/derivative/{2}".format(basedir, taskid, bag)
              logging.info("Accessing bag at: {0}".format(bagpath))
-             #for _, dirnames, filenames in os.walk(bagpath):
-             #    for dirname in dirnames:
-             #        for filename in filenames:
-             #            if dirname:
-             #                s3_key = "{0}/{1}/{2}/{3}/{4}".format(s3_destination, bag, formatparams, dirname, filename)
-             #                filepath = os.path.join(bagpath, dirname, filename)
-             #            else:
-             #                s3_key = "{0}/{1}/{2}/{3}".format(s3_destination, bag, formatparams, filename)
-             #                filepath = os.path.join(bagpath, filename)
-             #            logging.info("Uploading to s3: {0}".format(filepath))
-             #            s3.meta.client.upload_file(filepath, bucket.name, s3_key)
              for filepath in iglob("{0}/*.*".format(bagpath)):
                  filename = filepath.split('/')[-1].lower()
                  s3_key = "{0}/{1}/{2}/{3}".format(s3_destination, bag, formatparams, filename)
@@ -256,5 +243,5 @@ def process_derivative(derivative_args, mmsid=None, rmlocal=False):
              if rmlocal:
                  rmtree(bagpath)
 
-        return ["{0}/{1}/{2}/{1}.json".format(ou_derivative_bag_url, bag, formatparams) for bag in bags]
+        return ["{0}/{1}/{2}/{3}.json".format(ou_derivative_bag_url, bag, formatparams, bag.lower()) for bag in bags]
 
