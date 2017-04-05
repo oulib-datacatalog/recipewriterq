@@ -245,12 +245,12 @@ def process_derivative(derivative_args, mmsid=None, rmlocal=False):
              for filepath in iglob("{0}/*.*".format(bagpath)):
                  filename = filepath.split('/')[-1].lower()
                  s3_key = "{0}/{1}/{2}/{3}".format(s3_destination, bag, formatparams, filename)
-                 logging.info("Saving {0} to {1}".format(filename, s3_key)
+                 logging.info("Saving {0} to {1}".format(filename, s3_key))
                  s3.meta.client.upload_file(filepath, bucket.name, s3_key)
              for filepath in iglob("{0}/data/*.*".format(bagpath)):
                  filename = filepath.split('/')[-1].lower()
                  s3_key = "{0}/{1}/{2}/data/{3}".format(s3_destination, bag, formatparams, filename)
-                 logging.info("Saving {0} to {1}".format(filename, s3_key)
+                 logging.info("Saving {0} to {1}".format(filename, s3_key))
                  s3.meta.client.upload_file(filepath, bucket.name, s3_key)
              # remove derivative bag from local system
              if rmlocal:
