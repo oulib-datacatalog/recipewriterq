@@ -243,5 +243,5 @@ def process_derivative(derivative_args, mmsid=None, rmlocal=False):
              if rmlocal:
                  rmtree(bagpath)
 
-        return ",".join(["{0}/{1}/{2}/{3}.json".format(ou_derivative_bag_url, bag, formatparams, bag.lower()) for bag in bags])
+        return ["{0}/{1}/{2}/{3}.json".format(ou_derivative_bag_url, bag, formatparams, bag.lower()) for bag in bags]
 
