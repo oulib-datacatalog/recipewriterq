@@ -215,7 +215,8 @@ def process_derivative(derivative_args, mmsid=None, rmlocal=False):
     s3_destination='derivative'
     
     taskid = derivative_args.get('task_id')
-    bags = derivative_args.get('s3_bags')
+    s3_bags = derivative_args.get('s3_bags')
+    bags = s3_bags if isinstance(s3_bags, list) or s3_bags is None else [s3_bags]  # ensure bags is list or None
     formatparams = derivative_args.get('format_parameters')
     
     s3 = boto3.resource('s3')
