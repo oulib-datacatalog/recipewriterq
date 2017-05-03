@@ -198,14 +198,14 @@ def bag_derivatives(taskid, update_manifest=True):
 
 
 @task()
-def process_derivative(derivative_args, mmsid=None, rmlocal=False):
+def process_derivative(derivative_args, mmsid=None, rmlocal=True):
     """
     This task is called as part of the loadbook process. You should not run this directly.
 
     args:
       derivative_args: results from the derivative_generation task
       mmsid: mmsid of item to load
-      rmlocal: boolean indicating to remove local derivative bag after loading to s3 - default is False
+      rmlocal: boolean indicating to remove local derivative bag after loading to s3 - default is True
 
     Returns:
       List of urls to recipe files
