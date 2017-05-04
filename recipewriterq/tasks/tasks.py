@@ -3,22 +3,29 @@ __author__ = "Tyler Pearson <tdpearson>"
 from celery.task import task
 from collections import OrderedDict
 from glob import iglob
-from json import dumps
+from json import dumps, loads
 from shutil import rmtree
 from uuid import uuid5, NAMESPACE_DNS
 import xml.etree.cElementTree as ET
 import bagit
 import boto3
+import datetime
 import logging
 import os
 import requests
 
 # Default base directory
 basedir = "/data/web_data/static"
-hostname = "https://cc.lib.ou.edu"
+base_url = "https://cc.lib.ou.edu"
+api_url = "{0}/api".format(base_url)
+catalog_url = "{0}/catalog/data/catalog/digital_objects/.json".format(base_url)
 ou_derivative_bag_url = "https://bag.ou.edu/derivative"
+recipe_url = ou_derivative_bag_url + "/{0}/{1}/{2}.json"  # bagname, param string, lowercase bagname
+search_url = "{0}?query={{\"filter\": {{\"bag\": \"{1}\"}}}}"
 
 apikeypath = "/code/alma_api_key"
+cctokenfile = "/code/cybercom_token"
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -130,6 +137,53 @@ def get_marc_xml(mmsid, bagname, fullpath, bibxml):
         logging.error(err)
         return False
 
+
+def searchcatalog(bag):
+    resp = requests.get(search_url.format(catalog_url, bag))
+    catalogitems = loads(resp.text)
+    if catalogitems['count']:
+        return catalogitems['results'][0]
+
+
+def listpagefiles(bag, paramstring):
+    resp = requests.get(recipe_url.format(bag, paramstring, bag.lower()))
+    recipe = loads(resp.text)
+    return [page['file'] for page in recipe['recipe']['pages']]
+
+
+@task()
+def updatecatalog(bag, paramstring):
+    """
+    Update Bag in Data Catalog with derivative location
+    
+    args:
+      bag (string); Name of bag to update data catalog entry
+      paramstring (string);  Parameter settings of derivative (e.x. "jpeg_040_antialias")
+    """
+
+    """
+    Example derivative record structure:
+    {"jpg_040_antialias": {"recipe": <url string to to recipe file>,
+                           "datetime": <timestamp of derivative>,
+                           "pages": [<list of page urls>]
+                           }
+     }
+    """
+    catalogitem = searchcatalog(bag)
+    
+    if paramstring not in catalogitem["derivatives"]:
+        catalogitem["derivatives"][paramstring] = {}
+    catalogitem["derivatives"][paramstring]["recipe"] = recipe_url.format(bag, paramstring, bag.lower())
+    catalogitem["derivatives"][paramstring]["datetime"] = datetime.datetime.utcnow().isoformat()
+    catalogitem["derivatives"][paramstring]["pages"] = listpagefiles(bag, paramstring)
+    
+    token = open(cctokenfile).read().strip()
+    headers = {"Content-Type": "application/json", "Authorization": "Token {0}".format(token)}
+    req = requests.post(catalog_url, data=dumps(catalogitem), headers=headers)
+    req.raise_for_status()
+    return True
+
+
 @task()
 def derivative_recipe(taskid, mmsid=None, title=None, formatparams=None):
     """
@@ -165,7 +219,7 @@ def derivative_recipe(taskid, mmsid=None, title=None, formatparams=None):
         except IOError as err:
             logging.error(err)
     # point back at task
-    return "{0}/oulib_tasks/{1}".format(hostname, taskid)
+    return "{0}/oulib_tasks/{1}".format(base_url, taskid)
 
 
 @task()
@@ -194,7 +248,7 @@ def bag_derivatives(taskid, update_manifest=True):
         except IOError as err:
             logging.error(err)
     # point back at task
-    return "{0}/oulib_tasks/{1}".format(hostname, taskid)
+    return "{0}/oulib_tasks/{1}".format(base_url, taskid)
 
 
 @task()
@@ -240,9 +294,10 @@ def process_derivative(derivative_args, mmsid=None, rmlocal=True):
                  s3_key = "{0}/{1}/{2}/data/{3}".format(s3_destination, bag, formatparams, filename)
                  logging.info("Saving {0} to {1}".format(filename, s3_key))
                  s3.meta.client.upload_file(filepath, bucket.name, s3_key)
+             updatecatalog(bag, formatparams)
              # remove derivative bag from local system
              if rmlocal:
-                 rmtree(bagpath)
+                 rmtree("{0}/oulib_tasks/{1}".format(basedir, taskid))
 
         return ["{0}/{1}/{2}/{3}.json".format(ou_derivative_bag_url, bag, formatparams, bag.lower()) for bag in bags]
 
