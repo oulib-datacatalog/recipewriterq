@@ -18,7 +18,7 @@ import requests
 basedir = "/data/web_data/static"
 base_url = "https://cc.lib.ou.edu"
 api_url = "{0}/api".format(base_url)
-catalog_url = "{0}/catalog/data/catalog/digital_objects/.json".format(base_url)
+catalog_url = "{0}/catalog/data/catalog/digital_objects/.json".format(api_url)
 ou_derivative_bag_url = "https://bag.ou.edu/derivative"
 recipe_url = ou_derivative_bag_url + "/{0}/{1}/{2}.json"  # bagname, param string, lowercase bagname
 search_url = "{0}?query={{\"filter\": {{\"bag\": \"{1}\"}}}}"
