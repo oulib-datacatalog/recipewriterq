@@ -151,7 +151,7 @@ def listpagefiles(bag, paramstring):
     s3 = boto3.resource('s3')
     filename = "{0}.json".format(bag).lower()
     s3_key = "{0}/{1}/{2}/{3}".format(s3_destination, bag, paramstring, filename)
-    recipe_obj = s3.object(s3_bucket, s3_key)
+    recipe_obj = s3.Object(s3_bucket, s3_key)
     recipe_json = recipe_obj.get()['Body'].read()
     recipe = loads(recipe_json)
     #resp = requests.get(recipe_url.format(bag, paramstring, bag.lower()))
