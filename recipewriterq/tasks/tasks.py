@@ -146,8 +146,16 @@ def searchcatalog(bag):
 
 
 def listpagefiles(bag, paramstring):
-    resp = requests.get(recipe_url.format(bag, paramstring, bag.lower()))
-    recipe = loads(resp.text)
+    s3_bucket='ul-bagit'
+    s3_destination='derivative'
+    s3 = boto3.resource('s3')
+    filename = "{0}.json".format(bag).lower()
+    s3_key = "{0}/{1}/{2}/{3}".format(s3_destination, bag, paramstring, filename)
+    recipe_obj = s3.object(s3_bucket, s3_key)
+    recipe_json = recipe_obj.get()['Body'].read()
+    recipe = loads(recipe_json)
+    #resp = requests.get(recipe_url.format(bag, paramstring, bag.lower()))
+    #recipe = loads(resp.text)
     return [page['file'] for page in recipe['recipe']['pages']]
 
 
@@ -170,6 +178,8 @@ def updatecatalog(bag, paramstring):
      }
     """
     catalogitem = searchcatalog(bag)
+    if catalogitem = None:
+        return False  # this bag does not have a catalog entry
     
     if paramstring not in catalogitem["derivatives"]:
         catalogitem["derivatives"][paramstring] = {}
