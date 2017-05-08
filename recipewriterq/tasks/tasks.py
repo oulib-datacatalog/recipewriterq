@@ -178,7 +178,7 @@ def updatecatalog(bag, paramstring):
      }
     """
     catalogitem = searchcatalog(bag)
-    if catalogitem = None:
+    if catalogitem == None:
         return False  # this bag does not have a catalog entry
     
     if paramstring not in catalogitem["derivatives"]:
