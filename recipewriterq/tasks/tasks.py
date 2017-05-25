@@ -5,6 +5,7 @@ from collections import OrderedDict
 from glob import iglob
 from json import dumps, loads
 from shutil import rmtree
+from string import whitespace
 from uuid import uuid5, NAMESPACE_DNS
 import xml.etree.cElementTree as ET
 import bagit
@@ -83,7 +84,7 @@ def generate_recipe(mmsid, taskid, title, bagname, payload, fullpath, formatpara
     if not title:
         # attempt to set from marc xml
         logging.debug("Getting title from marc file")
-        meta['recipe']['label'] = get_title_from_bib(bib)
+        meta['recipe']['label'] = get_title_from_bib(bib).strip(whitespace + "/")
 
     meta['recipe']['pages'] = process_manifest(taskid, bagname, payload, formatparams)
 
