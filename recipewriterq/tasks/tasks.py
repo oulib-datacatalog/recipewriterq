@@ -82,9 +82,9 @@ def generate_recipe(mmsid, taskid, title, bagname, payload, fullpath, formatpara
             meta['recipe']['metadata']['marcxml'] = "{0}/{1}/marc.xml".format(ou_derivative_bag_url, bagname)
 
     if not title:
-        # attempt to set from marc xml
+        # attempt to set from bib record
         logging.debug("Getting title from marc file")
-        meta['recipe']['label'] = get_title_from_bib(bib).strip(whitespace + "/")
+        meta['recipe']['label'] = get_title_from_bib(bib).strip(whitespace + "/,")  # set title with removing undesired outer characters
 
     meta['recipe']['pages'] = process_manifest(taskid, bagname, payload, formatparams)
 
