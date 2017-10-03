@@ -2,11 +2,16 @@ __author__ = "Tyler Pearson <tdpearson>"
 
 from celery.task import task
 from collections import OrderedDict
+from functools import partial
+from operator import is_not
 from glob import iglob
 from json import dumps, loads
+from yaml import load as yaml_load
 from shutil import rmtree
 from string import whitespace
 from uuid import uuid5, NAMESPACE_DNS
+from lxml import etree
+from botocore.errorfactory import ClientError
 import xml.etree.cElementTree as ET
 import bagit
 import boto3
@@ -84,7 +89,8 @@ def generate_recipe(mmsid, taskid, title, bagname, payload, fullpath, formatpara
     if not title:
         # attempt to set from bib record
         logging.debug("Getting title from marc file")
-        meta['recipe']['label'] = get_title_from_bib(bib).strip(whitespace + "/,")  # set title with removing undesired outer characters
+        #meta['recipe']['label'] = get_title_from_bib(bib).strip(whitespace + "/,")  # set title with removing undesired outer characters
+        meta['recipe']['label'] = get_title_from_marc(bib)
 
     meta['recipe']['pages'] = process_manifest(taskid, bagname, payload, formatparams)
 
@@ -121,6 +127,39 @@ def get_title_from_bib(xml):
         return None
 
 
+def get_marc_datafield(tag_id, xml_tree):
+    try:
+        return xml_tree.xpath("record/datafield[@tag={0}]".format(tag_id))[0]
+    except IndexError:
+        return None
+
+
+def get_marc_subfield_text(tag_id, sub_code, xml_tree):
+    try:
+        return xml_tree.xpath("record/datafield[@tag={0}]/subfield[@code='{1}']".format(tag_id, sub_code))[0].text
+    except IndexError:
+        return None
+
+
+def get_title_from_marc(xml):
+    tag_preferences = OrderedDict([
+        # tag id, [ subfield codes ]
+        (130, ['a']),
+        (240, ['a']),
+        (245, ['a', 'b'])
+    ])
+    xml_tree = 
+    for tag in tag_preferences.keys():
+        if get_marc_datafield(tag, xml_tree) is not None:
+            title_parts = [get_marc_subfield_text(tag, code, xml_tree) for code in tag_preferences[tag]]
+            title_parts = list(filter(partial(is_not, None), title_parts))  # remove None values
+            if len(title_parts) > 1:
+                title = " ".join(title_parts)
+            else:
+                title = title_parts[0]
+            return title.strip(whitespace + "/,")
+
+
 def get_marc_xml(mmsid, bagname, fullpath, bibxml):
     """ Gets MARC21 record from bib xml """
 
@@ -138,6 +177,26 @@ def get_marc_xml(mmsid, bagname, fullpath, bibxml):
         logging.error(err)
         return False
 
+
+def get_mmsid(bag):
+    s3_bucket='ul-bagit'
+    s3 = boto3.resource('s3')
+    s3_key = "{0}/{1}/{3}".format('source', bag, 'bag-info.txt')
+    recipe_obj = s3.Object(s3_bucket, s3_key)
+    bag_info = yaml_load(recipe_obj.get()['Body'].read())
+    mmsid = bag_info['FIELD_EXTERNAL_DESCRIPTION'].split()[-1]
+    return mmsid
+
+
+def s3_source_bag_exists(bag):
+    s3_bucket='ul-bagit'
+    s3 = boto3.resource('s3')
+    s3_key = "{0}/{1}/{3}".format('source', bag, 'bag-info.txt')
+    try:
+        s3.head_object(Bucket=s3_bucket, Key=s3_key)
+        return True
+    except ClientError:
+        return False
 
 def searchcatalog(bag):
     resp = requests.get(search_url.format(catalog_url, bag))
