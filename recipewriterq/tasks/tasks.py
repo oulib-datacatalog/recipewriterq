@@ -148,7 +148,7 @@ def get_title_from_marc(xml):
         (240, ['a']),
         (245, ['a', 'b'])
     ])
-    xml_tree = 
+    xml_tree = etree.XML(xml)
     for tag in tag_preferences.keys():
         if get_marc_datafield(tag, xml_tree) is not None:
             title_parts = [get_marc_subfield_text(tag, code, xml_tree) for code in tag_preferences[tag]]
