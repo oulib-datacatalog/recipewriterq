@@ -19,6 +19,7 @@ import datetime
 import logging
 import os
 import requests
+import re
 
 # Default base directory
 basedir = "/data/web_data/static"
@@ -184,8 +185,10 @@ def get_mmsid(bag):
     s3_key = "{0}/{1}/{3}".format('source', bag, 'bag-info.txt')
     recipe_obj = s3.Object(s3_bucket, s3_key)
     bag_info = yaml_load(recipe_obj.get()['Body'].read())
-    mmsid = bag_info['FIELD_EXTERNAL_DESCRIPTION'].split()[-1]
-    return mmsid
+    mmsid = bag_info['FIELD_EXTERNAL_DESCRIPTION'].split()[-1].strip()
+    if re.match("^[0-9]+$", mmsid):  # check that we have an mmsid like value
+        return mmsid
+    return None
 
 
 def s3_source_bag_exists(bag):
@@ -197,6 +200,7 @@ def s3_source_bag_exists(bag):
         return True
     except ClientError:
         return False
+
 
 def searchcatalog(bag):
     resp = requests.get(search_url.format(catalog_url, bag))
