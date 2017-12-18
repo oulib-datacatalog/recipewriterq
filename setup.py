@@ -9,6 +9,5 @@ setup(name='recipewriterq',
           'bagit==1.5.4',
           'requests==2.13.0',
           'boto3',
-          'lxml',
       ],
 )
