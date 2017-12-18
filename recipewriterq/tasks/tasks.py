@@ -81,6 +81,10 @@ def generate_recipe(mmsid, taskid, title, bagname, payload, fullpath, formatpara
     if mmsid is None:
         logging.debug("getting mmsid from bag: {0}".format(bagname))
         mmsid = get_mmsid(bagname)
+    if mmsid is None:
+        msg = "No mmsid found for bag: {0}".format(bagname)
+        logging.error(msg)
+        raise Exception(msg)
 
     bib = get_bib_record(mmsid)
     
