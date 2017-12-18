@@ -188,7 +188,7 @@ def get_marc_xml(mmsid, bagname, fullpath, bibxml):
 def get_mmsid(bag):
     s3_bucket='ul-bagit'
     s3 = boto3.resource('s3')
-    s3_key = "{0}/{1}/{3}".format('source', bag, 'bag-info.txt')
+    s3_key = "{0}/{1}/{2}".format('source', bag, 'bag-info.txt')
     recipe_obj = s3.Object(s3_bucket, s3_key)
     bag_info = yaml_load(recipe_obj.get()['Body'].read())
     mmsid = bag_info['FIELD_EXTERNAL_DESCRIPTION'].split()[-1].strip()
