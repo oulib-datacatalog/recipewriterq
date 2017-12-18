@@ -79,11 +79,11 @@ def generate_recipe(mmsid, taskid, title, bagname, payload, fullpath, formatpara
     meta['recipe']['label'] = title
 
     if mmsid is None:
-        logging.debug("getting mmsid from bag: {0}".format(mmsid))
+        logging.debug("getting mmsid from bag: {0}".format(bagname))
         mmsid = get_mmsid(bagname)
 
     bib = get_bib_record(mmsid)
-
+    
     if get_marc_xml(mmsid, bagname, fullpath, bib):
         meta['recipe']['metadata'] = OrderedDict()
         if formatparams:
