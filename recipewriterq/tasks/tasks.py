@@ -79,8 +79,8 @@ def generate_recipe(mmsid, taskid, title, bagname, payload, fullpath, formatpara
     meta['recipe']['label'] = title
 
     if mmsid is None:
-        mmsid = get_mmsid(bagname)
         logging.debug("getting mmsid from bag: {0}".format(mmsid))
+        mmsid = get_mmsid(bagname)
 
     bib = get_bib_record(mmsid)
 
@@ -191,7 +191,11 @@ def get_mmsid(bag):
     s3_key = "{0}/{1}/{2}".format('source', bag, 'bag-info.txt')
     recipe_obj = s3.Object(s3_bucket, s3_key)
     bag_info = yaml_load(recipe_obj.get()['Body'].read())
-    mmsid = bag_info['FIELD_EXTERNAL_DESCRIPTION'].split()[-1].strip()
+    try:
+        mmsid = bag_info['FIELD_EXTERNAL_DESCRIPTION'].split()[-1].strip()
+    except KeyError:
+        logging.error("Cannot determine mmsid for bag: {0}".format(bag))
+        return None
     if re.match("^[0-9]+$", mmsid):  # check that we have an mmsid like value
         return mmsid
     return None
