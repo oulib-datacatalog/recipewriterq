@@ -83,6 +83,7 @@ def generate_recipe(mmsid, taskid, title, bagname, payload, fullpath, formatpara
         logging.debug("getting mmsid from bag: {0}".format(mmsid))
 
     bib = get_bib_record(mmsid)
+
     if get_marc_xml(mmsid, bagname, fullpath, bib):
         meta['recipe']['metadata'] = OrderedDict()
         if formatparams:
@@ -114,7 +115,7 @@ def get_bib_record(mmsid):
         apikey = None
         logging.error("Could not load apikey")
 
-    if apikey:
+    if apikey and mmsid:
         try:
             response = requests.get(url.format(mmsid, apikey))
             return response.content
@@ -167,10 +168,11 @@ def get_title_from_marc(xml):
 
 def get_marc_xml(mmsid, bagname, fullpath, bibxml):
     """ Gets MARC21 record from bib xml """
-
+    if bibxml is None:
+        return False  # we need the bibxml 
     record = ET.fromstring(bibxml).find("record")
     record.attrib['xmlns'] = "http://www.loc.gov/MARC21/slim"
-    if not record.find(".//*[@tag='001']"):  # add if missing id
+    if not record.find(".//*[@tag='001']") and mmsid is not None:  # add if missing id
         controlfield = ET.Element("controlfield", tag="001")
         controlfield.text = mmsid
         record.insert(1, controlfield)
