@@ -2,11 +2,16 @@ __author__ = "Tyler Pearson <tdpearson>"
 
 from celery.task import task
 from collections import OrderedDict
+from functools import partial
+from operator import is_not
 from glob import iglob
 from json import dumps, loads
+from yaml import load as yaml_load
 from shutil import rmtree
 from string import whitespace
 from uuid import uuid5, NAMESPACE_DNS
+#from lxml import etree
+from botocore.errorfactory import ClientError
 import xml.etree.cElementTree as ET
 import bagit
 import boto3
@@ -14,6 +19,7 @@ import datetime
 import logging
 import os
 import requests
+import re
 
 # Default base directory
 basedir = "/data/web_data/static"
@@ -72,7 +78,12 @@ def generate_recipe(mmsid, taskid, title, bagname, payload, fullpath, formatpara
     meta['recipe']['uuid'] = str(uuid5(repoUUID, bagname))
     meta['recipe']['label'] = title
 
+    if mmsid is None:
+        logging.debug("getting mmsid from bag: {0}".format(bagname))
+        mmsid = get_mmsid(bagname)
+
     bib = get_bib_record(mmsid)
+    
     if get_marc_xml(mmsid, bagname, fullpath, bib):
         meta['recipe']['metadata'] = OrderedDict()
         if formatparams:
@@ -84,7 +95,8 @@ def generate_recipe(mmsid, taskid, title, bagname, payload, fullpath, formatpara
     if not title:
         # attempt to set from bib record
         logging.debug("Getting title from marc file")
-        meta['recipe']['label'] = get_title_from_bib(bib).strip(whitespace + "/,")  # set title with removing undesired outer characters
+        #meta['recipe']['label'] = get_title_from_bib(bib).strip(whitespace + "/,")  # set title with removing undesired outer characters
+        meta['recipe']['label'] = get_title_from_marc(bib)
 
     meta['recipe']['pages'] = process_manifest(taskid, bagname, payload, formatparams)
 
@@ -103,7 +115,7 @@ def get_bib_record(mmsid):
         apikey = None
         logging.error("Could not load apikey")
 
-    if apikey:
+    if apikey and mmsid:
         try:
             response = requests.get(url.format(mmsid, apikey))
             return response.content
@@ -121,12 +133,46 @@ def get_title_from_bib(xml):
         return None
 
 
+def get_marc_datafield(tag_id, xml_tree):
+    try:
+        return xml_tree.xpath("record/datafield[@tag={0}]".format(tag_id))[0]
+    except IndexError:
+        return None
+
+
+def get_marc_subfield_text(tag_id, sub_code, xml_tree):
+    try:
+        return xml_tree.xpath("record/datafield[@tag={0}]/subfield[@code='{1}']".format(tag_id, sub_code))[0].text
+    except IndexError:
+        return None
+
+
+def get_title_from_marc(xml):
+    tag_preferences = OrderedDict([
+        # tag id, [ subfield codes ]
+        (130, ['a']),
+        (240, ['a']),
+        (245, ['a', 'b'])
+    ])
+    xml_tree = ET.XML(xml)
+    for tag in tag_preferences.keys():
+        if get_marc_datafield(tag, xml_tree) is not None:
+            title_parts = [get_marc_subfield_text(tag, code, xml_tree) for code in tag_preferences[tag]]
+            title_parts = list(filter(partial(is_not, None), title_parts))  # remove None values
+            if len(title_parts) > 1:
+                title = " ".join(title_parts)
+            else:
+                title = title_parts[0]
+            return title.strip(whitespace + "/,")
+
+
 def get_marc_xml(mmsid, bagname, fullpath, bibxml):
     """ Gets MARC21 record from bib xml """
-
+    if bibxml is None:
+        return False  # we need the bibxml 
     record = ET.fromstring(bibxml).find("record")
     record.attrib['xmlns'] = "http://www.loc.gov/MARC21/slim"
-    if not record.find(".//*[@tag='001']"):  # add if missing id
+    if not record.find(".//*[@tag='001']") and mmsid is not None:  # add if missing id
         controlfield = ET.Element("controlfield", tag="001")
         controlfield.text = mmsid
         record.insert(1, controlfield)
@@ -136,6 +182,33 @@ def get_marc_xml(mmsid, bagname, fullpath, bibxml):
         return True
     except IOError as err:
         logging.error(err)
+        return False
+
+
+def get_mmsid(bag):
+    s3_bucket='ul-bagit'
+    s3 = boto3.resource('s3')
+    s3_key = "{0}/{1}/{2}".format('source', bag, 'bag-info.txt')
+    recipe_obj = s3.Object(s3_bucket, s3_key)
+    bag_info = yaml_load(recipe_obj.get()['Body'].read())
+    try:
+        mmsid = bag_info['FIELD_EXTERNAL_DESCRIPTION'].split()[-1].strip()
+    except KeyError:
+        logging.error("Cannot determine mmsid for bag: {0}".format(bag))
+        return None
+    if re.match("^[0-9]+$", mmsid):  # check that we have an mmsid like value
+        return mmsid
+    return None
+
+
+def s3_source_bag_exists(bag):
+    s3_bucket='ul-bagit'
+    s3 = boto3.resource('s3')
+    s3_key = "{0}/{1}/{3}".format('source', bag, 'bag-info.txt')
+    try:
+        s3.head_object(Bucket=s3_bucket, Key=s3_key)
+        return True
+    except ClientError:
         return False
 
 
@@ -291,24 +364,27 @@ def process_derivative(derivative_args, mmsid=None, rmlocal=True):
         # generate meta and bag derivatives
         bag_derivatives(taskid)
         derivative_recipe(taskid, mmsid, formatparams=formatparams)
+        results = []
         for bag in bags:
-            # move derivative bag into s3
-             bagpath = "{0}/oulib_tasks/{1}/derivative/{2}".format(basedir, taskid, bag)
-             logging.info("Accessing bag at: {0}".format(bagpath))
-             for filepath in iglob("{0}/*.*".format(bagpath)):
-                 filename = filepath.split('/')[-1].lower()
-                 s3_key = "{0}/{1}/{2}/{3}".format(s3_destination, bag, formatparams, filename)
-                 logging.info("Saving {0} to {1}".format(filename, s3_key))
-                 s3.meta.client.upload_file(filepath, bucket.name, s3_key)
-             for filepath in iglob("{0}/data/*.*".format(bagpath)):
-                 filename = filepath.split('/')[-1].lower()
-                 s3_key = "{0}/{1}/{2}/data/{3}".format(s3_destination, bag, formatparams, filename)
-                 logging.info("Saving {0} to {1}".format(filename, s3_key))
-                 s3.meta.client.upload_file(filepath, bucket.name, s3_key)
-             updatecatalog(bag, formatparams)
-             # remove derivative bag from local system
-             if rmlocal:
-                 rmtree("{0}/oulib_tasks/{1}".format(basedir, taskid))
-
-        return ["{0}/{1}/{2}/{3}.json".format(ou_derivative_bag_url, bag, formatparams, bag.lower()) for bag in bags]
-
+            if s3_source_bag_exists:
+                # move derivative bag into s3
+                bagpath = "{0}/oulib_tasks/{1}/derivative/{2}".format(basedir, taskid, bag)
+                logging.info("Accessing bag at: {0}".format(bagpath))
+                for filepath in iglob("{0}/*.*".format(bagpath)):
+                    filename = filepath.split('/')[-1].lower()
+                    s3_key = "{0}/{1}/{2}/{3}".format(s3_destination, bag, formatparams, filename)
+                    logging.info("Saving {0} to {1}".format(filename, s3_key))
+                    s3.meta.client.upload_file(filepath, bucket.name, s3_key)
+                for filepath in iglob("{0}/data/*.*".format(bagpath)):
+                    filename = filepath.split('/')[-1].lower()
+                    s3_key = "{0}/{1}/{2}/data/{3}".format(s3_destination, bag, formatparams, filename)
+                    logging.info("Saving {0} to {1}".format(filename, s3_key))
+                    s3.meta.client.upload_file(filepath, bucket.name, s3_key)
+                updatecatalog(bag, formatparams)
+                # remove derivative bag from local system
+                if rmlocal is True:
+                    rmtree("{0}/oulib_tasks/{1}".format(basedir, taskid))
+                results.append("{0}/{1}/{2}/{3}.json".format(ou_derivative_bag_url, bag, formatparams, bag.lower()))
+            else:
+                results.append(None)
+        return results
