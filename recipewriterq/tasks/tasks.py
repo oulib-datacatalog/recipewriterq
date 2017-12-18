@@ -78,6 +78,10 @@ def generate_recipe(mmsid, taskid, title, bagname, payload, fullpath, formatpara
     meta['recipe']['uuid'] = str(uuid5(repoUUID, bagname))
     meta['recipe']['label'] = title
 
+    if mmsid is None:
+        mmsid = get_mmsid(bagname)
+        logging.debug("getting mmsid from bag: {0}".format(mmsid))
+
     bib = get_bib_record(mmsid)
     if get_marc_xml(mmsid, bagname, fullpath, bib):
         meta['recipe']['metadata'] = OrderedDict()
@@ -354,24 +358,27 @@ def process_derivative(derivative_args, mmsid=None, rmlocal=True):
         # generate meta and bag derivatives
         bag_derivatives(taskid)
         derivative_recipe(taskid, mmsid, formatparams=formatparams)
+        results = []
         for bag in bags:
-            # move derivative bag into s3
-             bagpath = "{0}/oulib_tasks/{1}/derivative/{2}".format(basedir, taskid, bag)
-             logging.info("Accessing bag at: {0}".format(bagpath))
-             for filepath in iglob("{0}/*.*".format(bagpath)):
-                 filename = filepath.split('/')[-1].lower()
-                 s3_key = "{0}/{1}/{2}/{3}".format(s3_destination, bag, formatparams, filename)
-                 logging.info("Saving {0} to {1}".format(filename, s3_key))
-                 s3.meta.client.upload_file(filepath, bucket.name, s3_key)
-             for filepath in iglob("{0}/data/*.*".format(bagpath)):
-                 filename = filepath.split('/')[-1].lower()
-                 s3_key = "{0}/{1}/{2}/data/{3}".format(s3_destination, bag, formatparams, filename)
-                 logging.info("Saving {0} to {1}".format(filename, s3_key))
-                 s3.meta.client.upload_file(filepath, bucket.name, s3_key)
-             updatecatalog(bag, formatparams)
-             # remove derivative bag from local system
-             if rmlocal:
-                 rmtree("{0}/oulib_tasks/{1}".format(basedir, taskid))
-
-        return ["{0}/{1}/{2}/{3}.json".format(ou_derivative_bag_url, bag, formatparams, bag.lower()) for bag in bags]
-
+            if s3_source_bag_exists:
+                # move derivative bag into s3
+                bagpath = "{0}/oulib_tasks/{1}/derivative/{2}".format(basedir, taskid, bag)
+                logging.info("Accessing bag at: {0}".format(bagpath))
+                for filepath in iglob("{0}/*.*".format(bagpath)):
+                    filename = filepath.split('/')[-1].lower()
+                    s3_key = "{0}/{1}/{2}/{3}".format(s3_destination, bag, formatparams, filename)
+                    logging.info("Saving {0} to {1}".format(filename, s3_key))
+                    s3.meta.client.upload_file(filepath, bucket.name, s3_key)
+                for filepath in iglob("{0}/data/*.*".format(bagpath)):
+                    filename = filepath.split('/')[-1].lower()
+                    s3_key = "{0}/{1}/{2}/data/{3}".format(s3_destination, bag, formatparams, filename)
+                    logging.info("Saving {0} to {1}".format(filename, s3_key))
+                    s3.meta.client.upload_file(filepath, bucket.name, s3_key)
+                updatecatalog(bag, formatparams)
+                # remove derivative bag from local system
+                if rmlocal is True:
+                    rmtree("{0}/oulib_tasks/{1}".format(basedir, taskid))
+                results.append("{0}/{1}/{2}/{3}.json".format(ou_derivative_bag_url, bag, formatparams, bag.lower()))
+            else:
+                results.append(None)
+        return results
