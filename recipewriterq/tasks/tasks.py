@@ -10,7 +10,7 @@ from yaml import load as yaml_load
 from shutil import rmtree
 from string import whitespace
 from uuid import uuid5, NAMESPACE_DNS
-from lxml import etree
+#from lxml import etree
 from botocore.errorfactory import ClientError
 import xml.etree.cElementTree as ET
 import bagit
@@ -154,7 +154,7 @@ def get_title_from_marc(xml):
         (240, ['a']),
         (245, ['a', 'b'])
     ])
-    xml_tree = etree.XML(xml)
+    xml_tree = ET.XML(xml)
     for tag in tag_preferences.keys():
         if get_marc_datafield(tag, xml_tree) is not None:
             title_parts = [get_marc_subfield_text(tag, code, xml_tree) for code in tag_preferences[tag]]
