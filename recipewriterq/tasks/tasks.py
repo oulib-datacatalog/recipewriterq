@@ -10,9 +10,9 @@ from yaml import load as yaml_load
 from shutil import rmtree
 from string import whitespace
 from uuid import uuid5, NAMESPACE_DNS
-#from lxml import etree
+from lxml import etree as ET
 from botocore.errorfactory import ClientError
-import xml.etree.cElementTree as ET
+#import xml.etree.cElementTree as ET
 import bagit
 import boto3
 import datetime
