@@ -22,16 +22,16 @@ import requests
 import re
 
 # Default base directory
-basedir = "/data/web_data/static"
-base_url = "https://cc.lib.ou.edu"
+basedir = os.environ.get('CC_STATIC_DIR')
+base_url = os.environ.get('CC_HOSTNAME')
 api_url = "{0}/api".format(base_url)
 catalog_url = "{0}/catalog/data/catalog/digital_objects/.json".format(api_url)
 ou_derivative_bag_url = "https://bag.ou.edu/derivative"
 recipe_url = ou_derivative_bag_url + "/{0}/{1}/{2}.json"  # bagname, param string, lowercase bagname
 search_url = "{0}?query={{\"filter\": {{\"bag\": \"{1}\"}}}}"
 
-apikeypath = "/code/alma_api_key"
-cctokenfile = "/code/cybercom_token"
+apikey = os.environ.get('ALMA_RO_TOKEN')
+cctoken = os.environ.get('CC_API_TOKEN')
 
 
 logging.basicConfig(level=logging.INFO)
@@ -109,11 +109,8 @@ def get_bib_record(mmsid):
 
     url = "https://api-na.hosted.exlibrisgroup.com/almaws/v1/bibs/{0}?expand=None&apikey={1}"
 
-    try:
-        apikey = open(apikeypath).read().strip()
-    except IOError:
-        apikey = None
-        logging.error("Could not load apikey")
+    if not apikey:
+        logging.error("Could not load Alma apikey")
 
     if apikey and mmsid:
         try:
@@ -261,8 +258,7 @@ def updatecatalog(bag, paramstring):
     catalogitem["derivatives"][paramstring]["datetime"] = datetime.datetime.utcnow().isoformat()
     catalogitem["derivatives"][paramstring]["pages"] = listpagefiles(bag, paramstring)
     
-    token = open(cctokenfile).read().strip()
-    headers = {"Content-Type": "application/json", "Authorization": "Token {0}".format(token)}
+    headers = {"Content-Type": "application/json", "Authorization": "Token {0}".format(cctoken)}
     req = requests.post(catalog_url, data=dumps(catalogitem), headers=headers)
     req.raise_for_status()
     return True
