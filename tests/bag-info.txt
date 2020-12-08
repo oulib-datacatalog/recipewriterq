@@ -1,0 +1,6 @@
+FIELD_BAG_COUNT: 1 of ?
+FIELD_EXTERNAL_IDENTIFIER: University of Oklahoma Libraries
+FIELD_EXTERNAL_DESCRIPTION: Hermes Trismegistus 1584 9910306702042
+Payload-Oxum: 320317172.19
+Bagging-Date: 2019-04-23
+Bag-Size: 305.5 MB

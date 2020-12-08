@@ -10,9 +10,9 @@ from yaml import load as yaml_load
 from shutil import rmtree
 from string import whitespace
 from uuid import uuid5, NAMESPACE_DNS
-#from lxml import etree
+from lxml import etree as ET
 from botocore.errorfactory import ClientError
-import xml.etree.cElementTree as ET
+#import xml.etree.cElementTree as ET
 import bagit
 import boto3
 import datetime
@@ -81,6 +81,10 @@ def generate_recipe(mmsid, taskid, title, bagname, payload, fullpath, formatpara
     if mmsid is None:
         logging.debug("getting mmsid from bag: {0}".format(bagname))
         mmsid = get_mmsid(bagname)
+    if mmsid is None:
+        msg = "No mmsid found for bag: {0}".format(bagname)
+        logging.error(msg)
+        raise Exception(msg)
 
     bib = get_bib_record(mmsid)
     
