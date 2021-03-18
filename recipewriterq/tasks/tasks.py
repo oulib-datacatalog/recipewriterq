@@ -189,7 +189,14 @@ def get_marc_xml(mmsid, bagname, fullpath, bibxml):
         return False
 
 
-def get_mmsid(bag):
+def _get_mmsid_catalog(bag):
+    """ fetch mmsid from data catalog metadata """
+    catalog = searchcatalog(bag)
+    return catalog.get("mmsid")
+
+
+def _get_mmsid_bag_info(bag):
+    """ parse mmsid from the bag-info.txt file """
     s3_bucket='ul-bagit'
     s3 = boto3.resource('s3')
     s3_key = "{0}/{1}/{2}".format('source', bag, 'bag-info.txt')
@@ -202,6 +209,15 @@ def get_mmsid(bag):
         return None
     if re.match("^[0-9]+$", mmsid):  # check that we have an mmsid like value
         return mmsid
+    return None
+
+
+def get_mmsid(bag):
+    """ try multiple methods to get mmsid of a bag and return the found mmsid """
+    for func in [_get_mmsid_catalog, _get_mmsid_bag_info]:
+        mmsid = func(bag)
+        if mmsid:
+            return mmsid
     return None
 
 
