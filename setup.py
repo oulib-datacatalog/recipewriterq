@@ -7,7 +7,7 @@ setup(name='recipewriterq',
       install_requires=[
           'bagit==1.5.4',
           'requests==2.24.0',
-          'PyYAML==5.3.1',
+          'PyYAML==5.4',
           'boto3',
           'lxml',
       ],
