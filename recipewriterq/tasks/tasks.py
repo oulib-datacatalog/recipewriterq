@@ -178,7 +178,7 @@ def get_marc_xml(mmsid, bagname, fullpath, bibxml):
     record.attrib['xmlns'] = "http://www.loc.gov/MARC21/slim"
     if not record.find(".//*[@tag='001']") and mmsid is not None:  # add if missing id
         controlfield = ET.Element("controlfield", tag="001")
-        controlfield.text = mmsid
+        controlfield.text = str(mmsid)
         record.insert(1, controlfield)
     marc21 = ET.ElementTree(record)
     try:

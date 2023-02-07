@@ -2,7 +2,7 @@
 #ez_setup.use_setuptools()
 from setuptools import setup, find_packages
 setup(name='recipewriterq',
-      version='0.3.6',
+      version='0.3.7',
       packages= find_packages(),
       install_requires=[
           'bagit==1.5.4',
